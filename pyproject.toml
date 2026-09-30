@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evidence-ledger"
+version = "0.1.0"
+description = "Audit local source snapshots and claim citations without a model or network."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Wang Haoxuan"}]
+dependencies = []
+
+[project.scripts]
+evidence-ledger = "evidence_ledger.cli:main"
+
+[project.urls]
+Repository = "https://github.com/jinxuansama/evidence-ledger"
+Issues = "https://github.com/jinxuansama/evidence-ledger/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]

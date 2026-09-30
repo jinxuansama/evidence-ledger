@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "alpha-report",
+      "path": "source.txt",
+      "sha256": "3686b78a9f9394f21d4a9123c437a3cc2d745bc66b6a7d1a27b086ab4e1ed6a2",
+      "rights": "Original synthetic fixture; MIT"
+    }
+  ],
+  "claims": [
+    {
+      "id": "revenue-2025",
+      "kind": "fact",
+      "text": "The fictional entity reports revenue of 12 units in 2025.",
+      "source_id": "alpha-report",
+      "quote": "reports revenue of 12 units in 2025"
+    },
+    {
+      "id": "growth-hypothesis",
+      "kind": "interpretation",
+      "text": "The reported increase could motivate a question about capacity.",
+      "source_id": "alpha-report",
+      "quote": "reports revenue of 12 units in 2025",
+      "rationale": "A hypothesis for later investigation; revenue alone does not identify a mechanism."
+    }
+  ]
+}

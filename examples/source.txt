@@ -1,0 +1,4 @@
+SYNTHETIC FIXTURE — NOT AN EMPIRICAL REPORT
+Fictional Alpha Research Cooperative reports revenue of 12 units in 2025.
+Fictional Alpha Research Cooperative reports revenue of 10 units in 2024.
+This fixture is original demonstration text distributed under the repository MIT license.
