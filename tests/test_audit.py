@@ -63,6 +63,41 @@ class AuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_audit()
 
+    def test_symlink_loop_is_reported_without_aborting_other_claims(self):
+        loop = self.root / "loop.txt"
+        try:
+            loop.symlink_to(loop.name)
+        except OSError:
+            self.skipTest("symlinks unavailable")
+        self.doc["sources"].insert(0, dict(id="loop", path=loop.name, sha256="0" * 64))
+        self.doc["claims"].append(dict(id="bad", text="Bad source", kind="fact",
+                                       source_id="loop", quote="anything"))
+        report = self.run_audit()
+        self.assertFalse(report["ok"])
+        self.assertIn(("unsafe_path", "loop"), {(i["code"], i["item"]) for i in report["issues"]})
+        checked = {claim["id"]: claim["provenance_ok"] for claim in report["claims"]}
+        self.assertTrue(checked["c1"])
+        self.assertFalse(checked["bad"])
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(main(["audit", str(self.manifest)]), 1)
+        self.assertFalse(json.loads(out.getvalue())["ok"])
+        self.assertEqual(err.getvalue(), "")
+
+    def test_embedded_null_path_is_a_structured_audit_error(self):
+        self.doc["sources"][0]["path"] = "source\x00.txt"
+        report = self.run_audit()
+        self.assertFalse(report["ok"])
+        self.assertIn("unsafe_path", {i["code"] for i in report["issues"]})
+
+    def test_in_directory_symlink_still_passes(self):
+        link = self.root / "link.txt"
+        try:
+            link.symlink_to(self.source.name)
+        except OSError:
+            self.skipTest("symlinks unavailable")
+        self.doc["sources"][0]["path"] = link.name
+        self.assertTrue(self.run_audit()["ok"])
+
     def test_interpretation_requires_rationale(self):
         self.doc["claims"][0]["kind"] = "interpretation"
         self.assertFalse(self.run_audit()["ok"])

@@ -21,6 +21,10 @@ records its digest; this does not prove that a publisher supplied those bytes.
 A source URL, date, or rights note may be recorded as metadata but is not
 independently verified. Snapshot paths are resolved before reading and must
 remain under the manifest directory, including symlink targets.
+Unresolvable paths, symlink loops, and paths containing a null character
+produce an `unsafe_path` audit issue rather than aborting the report. Other
+sources and claims are still checked. In-directory symlinks remain supported;
+missing files and invalid UTF-8 produce `unreadable_source` issues as before.
 
 Reports have an `ok` flag, counts, per-claim `provenance_ok`, referenced
 claim IDs, structured issues, and a limitation statement. No network or

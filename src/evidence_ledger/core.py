@@ -1,6 +1,7 @@
 """Deterministic, offline checks of a claim/source ledger."""
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import re
@@ -49,10 +50,14 @@ def audit(manifest_path: str | Path, draft_path: str | Path | None = None) -> di
 
     for key, source in sources.items():
         raw = source.get("path")
-        if not isinstance(raw, str) or not raw or Path(raw).is_absolute():
+        if not isinstance(raw, str) or not raw or "\x00" in raw or Path(raw).is_absolute():
             issue("unsafe_path", key, "source path must be relative")
             continue
-        path = (manifest_path.parent / raw).resolve()
+        try:
+            path = (manifest_path.parent / raw).resolve()
+        except (OSError, RuntimeError, ValueError):
+            issue("unsafe_path", key, "source path cannot be resolved safely")
+            continue
         if not path.is_relative_to(manifest_path.parent):
             issue("unsafe_path", key, "source path escapes the manifest directory")
             continue
@@ -63,8 +68,12 @@ def audit(manifest_path: str | Path, draft_path: str | Path | None = None) -> di
         try:
             blob = path.read_bytes()
             text = blob.decode("utf-8")
-        except (OSError, UnicodeError):
-            issue("unreadable_source", key, "source must be a readable UTF-8 text file")
+        except (OSError, UnicodeError) as exc:
+            if isinstance(exc, OSError) and exc.errno == errno.ELOOP:
+                # Non-strict resolve() can leave loops unresolved on Python 3.13+.
+                issue("unsafe_path", key, "source path contains a symlink loop")
+            else:
+                issue("unreadable_source", key, "source must be a readable UTF-8 text file")
             continue
         if hashlib.sha256(blob).hexdigest() != expected:
             issue("hash_mismatch", key, "snapshot differs from the recorded digest")
