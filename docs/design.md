@@ -3,6 +3,11 @@
 The manifest is a JSON object with `version: 1`, `sources`, and `claims`.
 IDs are unique within each list and contain ASCII letters, digits, `.`, `_`,
 or `-`. Unknown optional metadata is preserved in the manifest but not audited.
+JSON member names must be unique within each object, including metadata.
+Repeated names (also when spelled with JSON escapes) are invalid input instead
+of silently replacing an earlier value. The same member name may appear in
+separate objects. The Python API raises `ValueError` and the CLI exits with
+code 2 without writing a report for this ambiguous input.
 
 | Object | Required fields | Meaning |
 | --- | --- | --- |

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject duplicate JSON member names at every level of a manifest before
+  auditing; repeated fields can no longer silently replace sources or claims.
 - Report unresolvable source paths and symlink loops as `unsafe_path` audit
   issues instead of aborting the report; reject embedded null characters.
   Continue checking other sources and preserve normal in-directory symlinks.

@@ -15,6 +15,15 @@ def sha256(path: str | Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _unique_object(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON member: {key!r}")
+        result[key] = value
+    return result
+
+
 def _index(items: object, label: str) -> dict:
     if not isinstance(items, list):
         raise ValueError(f"{label} must be a list")
@@ -38,7 +47,7 @@ def audit(manifest_path: str | Path, draft_path: str | Path | None = None) -> di
     semantic entailment. Local source paths must stay within the manifest tree.
     """
     manifest_path = Path(manifest_path).resolve()
-    doc = json.loads(manifest_path.read_text(encoding="utf-8"))
+    doc = json.loads(manifest_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
     if not isinstance(doc, dict) or doc.get("version") != 1:
         raise ValueError("manifest must be an object with version=1")
     sources = _index(doc.get("sources"), "sources")
