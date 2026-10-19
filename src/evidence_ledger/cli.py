@@ -21,7 +21,7 @@ def main(argv=None):
         if args.command == "hash":
             print(sha256(args.file))
             return 0
-        report = audit(args.manifest, args.draft)
+        report = audit(args.manifest, args.draft, output_path=args.output)
         text = markdown_report(report) if args.format == "markdown" else json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         if args.output:
             args.output.write_text(text, encoding="utf-8")
