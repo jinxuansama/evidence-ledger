@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prevent `--output` from overwriting the manifest, draft, or a declared
+  source snapshot, including aliases through hardlinks and symlinks.
 - Reject duplicate JSON member names at every level of a manifest before
   auditing; repeated fields can no longer silently replace sources or claims.
 - Report unresolvable source paths and symlink loops as `unsafe_path` audit

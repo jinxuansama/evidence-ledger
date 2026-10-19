@@ -2,6 +2,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -151,6 +152,61 @@ class AuditTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()) as err:
             self.assertEqual(main(["audit", str(self.manifest)]), 2)
         self.assertNotIn("Traceback", err.getvalue())
+
+    def test_cli_output_cannot_overwrite_manifest_or_draft(self):
+        draft = self.root / "draft.md"
+        for output in (self.manifest, draft):
+            with self.subTest(output=output.name):
+                self.run_audit()
+                draft.write_text("Synthetic claim [[claim:c1]]\n", encoding="utf-8")
+                before = output.read_bytes()
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    code = main(["audit", str(self.manifest), "--draft", str(draft),
+                                 "--output", str(output)])
+                self.assertEqual(code, 2)
+                self.assertEqual(stdout.getvalue(), "")
+                self.assertIn("output path aliases", stderr.getvalue())
+                self.assertEqual(output.read_bytes(), before)
+                self.assertTrue(audit(self.manifest, draft)["ok"])
+
+    def test_cli_output_cannot_overwrite_source_through_a_hardlink(self):
+        self.run_audit()
+        output = self.root / "report.txt"
+        try:
+            os.link(self.source, output)
+        except OSError:
+            self.skipTest("hardlinks unavailable")
+        before = self.source.read_bytes()
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = main(["audit", str(self.manifest), "--output", str(output)])
+        self.assertEqual(code, 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("output path aliases", stderr.getvalue())
+        self.assertEqual(self.source.read_bytes(), before)
+        self.assertEqual(output.read_bytes(), before)
+
+    def test_cli_output_cannot_overwrite_source_through_a_symlink(self):
+        self.run_audit()
+        output = self.root / "linked-report.txt"
+        try:
+            output.symlink_to(self.source.name)
+        except OSError:
+            self.skipTest("symlinks unavailable")
+        before = self.source.read_bytes()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 2)
+        self.assertEqual(self.source.read_bytes(), before)
+
+    def test_cli_can_replace_an_existing_report(self):
+        self.run_audit()
+        output = self.root / "report.json"
+        output.write_text("stale report", encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 0)
+        self.assertTrue(json.loads(output.read_text(encoding="utf-8"))["ok"])
+        self.assertTrue(audit(self.manifest)["ok"])
 
     def test_empty_quote_and_invalid_source_types(self):
         self.doc["claims"][0]["quote"] = " "

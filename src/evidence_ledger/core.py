@@ -24,6 +24,18 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict:
     return result
 
 
+def _same_file(path: Path, other: Path) -> bool:
+    try:
+        return path.samefile(other)
+    except FileNotFoundError:
+        try:
+            return path.resolve() == other.resolve()
+        except (OSError, RuntimeError, ValueError):
+            return False
+    except (OSError, ValueError):
+        return False
+
+
 def _index(items: object, label: str) -> dict:
     if not isinstance(items, list):
         raise ValueError(f"{label} must be a list")
@@ -40,11 +52,13 @@ def _index(items: object, label: str) -> dict:
     return result
 
 
-def audit(manifest_path: str | Path, draft_path: str | Path | None = None) -> dict:
+def audit(manifest_path: str | Path, draft_path: str | Path | None = None,
+          *, output_path: str | Path | None = None) -> dict:
     """Check hashes, exact excerpts, and explicit draft references.
 
     A passing check establishes provenance consistency, not source truth or
     semantic entailment. Local source paths must stay within the manifest tree.
+    An optional output path must not alias the manifest, draft, or a source.
     """
     manifest_path = Path(manifest_path).resolve()
     doc = json.loads(manifest_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
@@ -52,6 +66,18 @@ def audit(manifest_path: str | Path, draft_path: str | Path | None = None) -> di
         raise ValueError("manifest must be an object with version=1")
     sources = _index(doc.get("sources"), "sources")
     claims = _index(doc.get("claims"), "claims")
+    if output_path is not None:
+        output = Path(output_path)
+        inputs = [("manifest", manifest_path)]
+        if draft_path is not None:
+            inputs.append(("draft", Path(draft_path)))
+        for source in sources.values():
+            raw = source.get("path")
+            if isinstance(raw, str) and raw and "\x00" not in raw:
+                inputs.append(("source snapshot", manifest_path.parent / raw))
+        for label, path in inputs:
+            if _same_file(path, output):
+                raise ValueError(f"output path aliases an audit input ({label})")
     issues, texts, valid_sources = [], {}, set()
 
     def issue(code, item, message, severity="error"):

@@ -35,6 +35,10 @@ Reports have an `ok` flag, counts, per-claim `provenance_ok`, referenced
 claim IDs, structured issues, and a limitation statement. No network or
 model calls occur. Text size is limited only by available memory; do not
 process untrusted huge files with elevated permissions.
+When an output path is provided, it must not refer to the manifest, draft,
+or any declared local source snapshot, including through a hardlink or
+symlink. The CLI returns invalid-input exit code 2 before writing in that
+case. An unrelated existing report file may still be replaced deliberately.
 
 Tests deliberately include a false claim with a matching excerpt to show
 why passing provenance checks cannot be advertised as fact verification.
