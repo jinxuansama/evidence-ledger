@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evidence-ledger"
-version = "0.1.0"
+version = "0.1.1"
 description = "Audit local source snapshots and claim citations without a model or network."
 readme = "README.md"
 requires-python = ">=3.10"

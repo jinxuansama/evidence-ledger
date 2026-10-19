@@ -52,7 +52,7 @@ invalid input or I/O errors. Warnings do not change a passing exit code.
 
 ## Scope and maturity
 
-Initial version 0.1.0. Supports UTF-8 text snapshots, not PDF parsing, web
+Current version 0.1.1. Supports UTF-8 text snapshots, not PDF parsing, web
 retrieval, semantic verification, or bibliography formatting. Paths cannot
 escape the manifest directory, including through symlinks. The ledger may
 still contain a wrong interpretation or false source; human review is needed.
