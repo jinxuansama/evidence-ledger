@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from evidence_ledger.core import audit
 from evidence_ledger.cli import main
@@ -207,6 +208,34 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 0)
         self.assertTrue(json.loads(output.read_text(encoding="utf-8"))["ok"])
         self.assertTrue(audit(self.manifest)["ok"])
+
+    def test_cli_replace_failure_preserves_previous_report(self):
+        self.run_audit()
+        output = self.root / "report.json"
+        output.write_text("previous complete report", encoding="utf-8")
+        with mock.patch("os.replace", side_effect=OSError("simulated replace failure")):
+            with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+                code = main(["audit", str(self.manifest), "--output", str(output)])
+        self.assertEqual(code, 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertIn("simulated replace failure", err.getvalue())
+        self.assertEqual(output.read_text(encoding="utf-8"), "previous complete report")
+        self.assertEqual(list(self.root.glob(".report.json.*.tmp")), [])
+
+    def test_cli_atomic_output_preserves_unrelated_report_symlink(self):
+        self.run_audit()
+        target = self.root / "report-target.json"
+        target.write_text("stale report", encoding="utf-8")
+        output = self.root / "report-link.json"
+        try:
+            output.symlink_to(target.name)
+        except OSError:
+            self.skipTest("symlinks unavailable")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 0)
+        self.assertTrue(output.is_symlink())
+        self.assertTrue(json.loads(target.read_text(encoding="utf-8"))["ok"])
+        self.assertEqual(list(self.root.glob(".report-target.json.*.tmp")), [])
 
     def test_empty_quote_and_invalid_source_types(self):
         self.doc["claims"][0]["quote"] = " "

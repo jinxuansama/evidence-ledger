@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Write reports to a same-directory temporary file before atomic replacement.
+  Preserve an existing report and clean up the temporary file when writing or
+  replacement fails; preserve unrelated report symlinks.
+
 ## 0.1.1 — 2026-10-19
 
 - Prevent `--output` from overwriting the manifest, draft, or a declared

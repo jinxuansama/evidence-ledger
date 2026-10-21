@@ -39,6 +39,12 @@ When an output path is provided, it must not refer to the manifest, draft,
 or any declared local source snapshot, including through a hardlink or
 symlink. The CLI returns invalid-input exit code 2 before writing in that
 case. An unrelated existing report file may still be replaced deliberately.
+Report output is fully written and flushed to a temporary file in the target
+directory before an atomic replacement. A write or replacement error preserves
+an existing report and removes the temporary file. An unrelated report symlink
+continues to update its resolved target without replacing the symlink. This
+protects against partial application-level writes, not every power-loss or
+filesystem failure mode.
 
 Tests deliberately include a false claim with a matching excerpt to show
 why passing provenance checks cannot be advertised as fact verification.
