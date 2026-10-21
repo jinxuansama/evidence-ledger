@@ -24,10 +24,10 @@ def _write_text_atomic(path: Path, text: str) -> None:
     )
     temporary = Path(temporary_name)
     try:
+        if mode is not None:
+            temporary.chmod(mode)
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as stream:
             fd = -1
-            if mode is not None:
-                os.fchmod(stream.fileno(), mode)
             stream.write(text)
             stream.flush()
             os.fsync(stream.fileno())
