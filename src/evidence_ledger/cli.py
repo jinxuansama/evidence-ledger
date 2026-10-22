@@ -19,23 +19,20 @@ def _write_text_atomic(path: Path, text: str) -> None:
         mode = stat.S_IMODE(target.stat().st_mode)
     except FileNotFoundError:
         mode = None
-    fd, temporary_name = tempfile.mkstemp(
+    # A private directory protects the temporary report while normal exclusive
+    # creation lets the OS apply the umask (without changing process-wide state).
+    # Keeping it beside the target also keeps replacement on one filesystem.
+    with tempfile.TemporaryDirectory(
         prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
-    )
-    temporary = Path(temporary_name)
-    try:
-        if mode is not None:
-            temporary.chmod(mode)
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as stream:
-            fd = -1
+    ) as temporary_dir:
+        temporary = Path(temporary_dir) / "report"
+        with temporary.open("x", encoding="utf-8", newline="") as stream:
             stream.write(text)
             stream.flush()
             os.fsync(stream.fileno())
+        if mode is not None:
+            temporary.chmod(mode)
         os.replace(temporary, target)
-    finally:
-        if fd != -1:
-            os.close(fd)
-        temporary.unlink(missing_ok=True)
 
 
 def main(argv=None):
