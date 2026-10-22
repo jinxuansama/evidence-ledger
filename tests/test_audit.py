@@ -3,9 +3,13 @@ import hashlib
 import io
 import json
 import os
+import stat
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from evidence_ledger.core import audit
 from evidence_ledger.cli import main
@@ -207,6 +211,108 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 0)
         self.assertTrue(json.loads(output.read_text(encoding="utf-8"))["ok"])
         self.assertTrue(audit(self.manifest)["ok"])
+
+    def test_cli_replace_failure_preserves_previous_report(self):
+        self.run_audit()
+        output = self.root / "report.json"
+        output.write_text("previous complete report", encoding="utf-8")
+        with mock.patch("os.replace", side_effect=OSError("simulated replace failure")):
+            with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+                code = main(["audit", str(self.manifest), "--output", str(output)])
+        self.assertEqual(code, 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertIn("simulated replace failure", err.getvalue())
+        self.assertEqual(output.read_text(encoding="utf-8"), "previous complete report")
+        self.assertEqual(list(self.root.glob(".report.json.*.tmp")), [])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission semantics")
+    def test_cli_new_report_respects_umask(self):
+        self.run_audit()
+        for mask in (0o022, 0o002, 0o027, 0o077):
+            with self.subTest(umask=oct(mask)):
+                output = self.root / f"report-{mask}.json"
+                # Isolate umask changes from the test runner and its threads.
+                result = subprocess.run([
+                    sys.executable, "-c",
+                    "import os, sys; from evidence_ledger.cli import main; "
+                    "os.umask(int(sys.argv[1])); "
+                    "sys.exit(main(sys.argv[2:]))",
+                    str(mask), "audit", str(self.manifest), "--output", str(output),
+                ], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "")
+                self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o666 & ~mask)
+                self.assertTrue(json.loads(output.read_text(encoding="utf-8"))["ok"])
+        self.assertEqual(list(self.root.glob(".*.tmp")), [])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission semantics")
+    def test_cli_existing_report_mode_is_independent_of_umask(self):
+        self.run_audit()
+        output = self.root / "report.json"
+        for mode in (0o600, 0o640, 0o664, 0o444):
+            for mask in (0o022, 0o077):
+                with self.subTest(mode=oct(mode), umask=oct(mask)):
+                    if output.exists():
+                        output.unlink()
+                    output.write_text("old report", encoding="utf-8")
+                    output.chmod(mode)
+                    result = subprocess.run([
+                        sys.executable, "-c",
+                        "import os, sys; from evidence_ledger.cli import main; "
+                        "os.umask(int(sys.argv[1])); "
+                        "sys.exit(main(sys.argv[2:]))",
+                        str(mask), "audit", str(self.manifest), "--output", str(output),
+                    ], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(stat.S_IMODE(output.stat().st_mode), mode)
+                    self.assertTrue(json.loads(output.read_text(encoding="utf-8"))["ok"])
+        self.assertEqual(list(self.root.glob(".*.tmp")), [])
+
+    def test_cli_sync_failure_preserves_previous_report(self):
+        self.run_audit()
+        output = self.root / "report.json"
+        output.write_bytes(b"previous complete report")
+        with mock.patch("os.fsync", side_effect=OSError("simulated sync failure")):
+            with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 2)
+        self.assertEqual(output.read_bytes(), b"previous complete report")
+        self.assertEqual(out.getvalue(), "")
+        self.assertIn("simulated sync failure", err.getvalue())
+        self.assertEqual(list(self.root.glob(".*.tmp")), [])
+
+    def test_cli_interruption_preserves_report_and_cleans_temporary_files(self):
+        self.run_audit()
+        output = self.root / "report.json"
+        for stage in ("os.fsync", "os.replace"):
+            for exists in (False, True):
+                with self.subTest(stage=stage, existing_report=exists):
+                    if exists:
+                        output.write_bytes(b"previous complete report")
+                    else:
+                        output.unlink(missing_ok=True)
+                    with mock.patch(stage, side_effect=KeyboardInterrupt):
+                        with self.assertRaises(KeyboardInterrupt):
+                            main(["audit", str(self.manifest), "--output", str(output)])
+                    if exists:
+                        self.assertEqual(output.read_bytes(), b"previous complete report")
+                    else:
+                        self.assertFalse(output.exists())
+                    self.assertEqual(list(self.root.glob(".*.tmp")), [])
+
+    def test_cli_atomic_output_preserves_unrelated_report_symlink(self):
+        self.run_audit()
+        target = self.root / "report-target.json"
+        target.write_text("stale report", encoding="utf-8")
+        output = self.root / "report-link.json"
+        try:
+            output.symlink_to(target.name)
+        except OSError:
+            self.skipTest("symlinks unavailable")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 0)
+        self.assertTrue(output.is_symlink())
+        self.assertTrue(json.loads(target.read_text(encoding="utf-8"))["ok"])
+        self.assertEqual(list(self.root.glob(".report-target.json.*.tmp")), [])
 
     def test_empty_quote_and_invalid_source_types(self):
         self.doc["claims"][0]["quote"] = " "
