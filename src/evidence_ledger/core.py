@@ -4,6 +4,7 @@ from __future__ import annotations
 import errno
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -14,7 +15,9 @@ _WINDOWS_CANT_RESOLVE_FILENAME = 1921
 
 def _is_symlink_loop_error(exc: OSError) -> bool:
     """Recognize POSIX and Windows signals for an unresolvable link loop."""
-    return exc.errno == errno.ELOOP or getattr(exc, "winerror", None) == _WINDOWS_CANT_RESOLVE_FILENAME
+    return (exc.errno == errno.ELOOP
+            or getattr(exc, "winerror", None) == _WINDOWS_CANT_RESOLVE_FILENAME
+            or (os.name == "nt" and exc.errno == errno.EINVAL))
 
 
 def sha256(path: str | Path) -> str:
