@@ -1,4 +1,5 @@
 import contextlib
+import errno
 import hashlib
 import io
 import json
@@ -11,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from evidence_ledger.core import audit
+from evidence_ledger.core import _is_symlink_loop_error, audit
 from evidence_ledger.cli import main
 
 
@@ -123,6 +124,14 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(main(["audit", str(self.manifest)]), 1)
         self.assertFalse(json.loads(out.getvalue())["ok"])
         self.assertEqual(err.getvalue(), "")
+
+    def test_symlink_loop_errors_are_classified_portably(self):
+        posix_error = OSError(errno.ELOOP, "too many symbolic links")
+        windows_error = OSError(errno.EINVAL, "cannot resolve filename")
+        windows_error.winerror = 1921
+        self.assertTrue(_is_symlink_loop_error(posix_error))
+        self.assertTrue(_is_symlink_loop_error(windows_error))
+        self.assertFalse(_is_symlink_loop_error(OSError(errno.ENOENT, "missing")))
 
     def test_embedded_null_path_is_a_structured_audit_error(self):
         self.doc["sources"][0]["path"] = "source\x00.txt"
