@@ -4,11 +4,20 @@ from __future__ import annotations
 import errno
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
 MARKER = re.compile(r"\[\[claim:([A-Za-z0-9_.-]+)\]\]")
 ID = re.compile(r"[A-Za-z0-9_.-]+\Z")
+_WINDOWS_CANT_RESOLVE_FILENAME = 1921
+
+
+def _is_symlink_loop_error(exc: OSError) -> bool:
+    """Recognize POSIX and Windows signals for an unresolvable link loop."""
+    return (exc.errno == errno.ELOOP
+            or getattr(exc, "winerror", None) == _WINDOWS_CANT_RESOLVE_FILENAME
+            or (os.name == "nt" and exc.errno == errno.EINVAL))
 
 
 def sha256(path: str | Path) -> str:
@@ -104,7 +113,7 @@ def audit(manifest_path: str | Path, draft_path: str | Path | None = None,
             blob = path.read_bytes()
             text = blob.decode("utf-8")
         except (OSError, UnicodeError) as exc:
-            if isinstance(exc, OSError) and exc.errno == errno.ELOOP:
+            if isinstance(exc, OSError) and _is_symlink_loop_error(exc):
                 # Non-strict resolve() can leave loops unresolved on Python 3.13+.
                 issue("unsafe_path", key, "source path contains a symlink loop")
             else:
