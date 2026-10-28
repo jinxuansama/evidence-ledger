@@ -5,6 +5,8 @@
 - Write reports to a same-directory temporary file before atomic replacement.
   Preserve an existing report and clean up the temporary file when writing or
   replacement fails; preserve unrelated report symlinks.
+- Run the supported Python test matrix on Windows as well as Ubuntu, and
+  classify Windows symlink-loop resolution failures as `unsafe_path`.
 
 ## 0.1.1 — 2026-10-19
 
