@@ -131,6 +131,8 @@ class AuditTests(unittest.TestCase):
         windows_error.winerror = 1921
         self.assertTrue(_is_symlink_loop_error(posix_error))
         self.assertTrue(_is_symlink_loop_error(windows_error))
+        with mock.patch("evidence_ledger.core.os.name", "nt"):
+            self.assertTrue(_is_symlink_loop_error(OSError(errno.EINVAL, "invalid argument")))
         self.assertFalse(_is_symlink_loop_error(OSError(errno.ENOENT, "missing")))
 
     def test_embedded_null_path_is_a_structured_audit_error(self):
