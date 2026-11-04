@@ -310,6 +310,18 @@ class AuditTests(unittest.TestCase):
                         self.assertFalse(output.exists())
                     self.assertEqual(list(self.root.glob(".*.tmp")), [])
 
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "FIFO unavailable")
+    def test_cli_atomic_output_rejects_non_regular_target(self):
+        self.run_audit()
+        output = self.root / "report.pipe"
+        os.mkfifo(output)
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertIn("output path must name a regular file", err.getvalue())
+        self.assertTrue(stat.S_ISFIFO(output.stat().st_mode))
+        self.assertEqual(list(self.root.glob(".evidence-ledger-*.tmp")), [])
+
     @unittest.skipUnless(os.name == "posix", "POSIX NAME_MAX semantics")
     def test_cli_atomic_output_supports_long_valid_filename(self):
         self.run_audit()
