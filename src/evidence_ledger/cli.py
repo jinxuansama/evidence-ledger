@@ -23,7 +23,7 @@ def _write_text_atomic(path: Path, text: str) -> None:
     # creation lets the OS apply the umask (without changing process-wide state).
     # Keeping it beside the target also keeps replacement on one filesystem.
     with tempfile.TemporaryDirectory(
-        prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
+        prefix=".evidence-ledger-", suffix=".tmp", dir=target.parent
     ) as temporary_dir:
         temporary = Path(temporary_dir) / "report"
         with temporary.open("x", encoding="utf-8", newline="") as stream:
