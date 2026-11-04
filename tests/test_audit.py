@@ -310,6 +310,15 @@ class AuditTests(unittest.TestCase):
                         self.assertFalse(output.exists())
                     self.assertEqual(list(self.root.glob(".*.tmp")), [])
 
+    @unittest.skipUnless(os.name == "posix", "POSIX NAME_MAX semantics")
+    def test_cli_atomic_output_supports_long_valid_filename(self):
+        self.run_audit()
+        output = self.root / ("r" * 240 + ".json")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 0)
+        self.assertTrue(json.loads(output.read_text(encoding="utf-8"))["ok"])
+        self.assertEqual(list(self.root.glob(".evidence-ledger-*.tmp")), [])
+
     def test_cli_atomic_output_preserves_unrelated_report_symlink(self):
         self.run_audit()
         target = self.root / "report-target.json"
