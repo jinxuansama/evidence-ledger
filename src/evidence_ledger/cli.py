@@ -16,9 +16,13 @@ def _write_text_atomic(path: Path, text: str) -> None:
     except (OSError, RuntimeError) as exc:
         raise ValueError("output path cannot be resolved safely") from exc
     try:
-        mode = stat.S_IMODE(target.stat().st_mode)
+        target_stat = target.stat()
     except FileNotFoundError:
         mode = None
+    else:
+        if not stat.S_ISREG(target_stat.st_mode):
+            raise ValueError("output path must name a regular file")
+        mode = stat.S_IMODE(target_stat.st_mode)
     # A private directory protects the temporary report while normal exclusive
     # creation lets the OS apply the umask (without changing process-wide state).
     # Keeping it beside the target also keeps replacement on one filesystem.
