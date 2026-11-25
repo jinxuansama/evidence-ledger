@@ -84,6 +84,29 @@ class AuditTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, f"duplicate JSON member: {key!r}"):
                     audit(self.manifest)
 
+    def test_non_finite_json_values_raise_before_auditing(self):
+        original = json.dumps(self.doc)
+        for value in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(value=value):
+                manifest = original[:-1] + f', "metadata": {{"score": {value}}}}}'
+                self.manifest.write_text(manifest, encoding="utf-8")
+                with self.assertRaisesRegex(
+                    ValueError, f"non-finite JSON value is not permitted: {value}"
+                ):
+                    audit(self.manifest)
+
+    def test_non_finite_json_is_a_cli_input_error_without_report(self):
+        manifest = json.dumps(self.doc)[:-1] + ', "metadata": {"score": NaN}}'
+        self.manifest.write_text(manifest, encoding="utf-8")
+        output = self.root / "report.json"
+        output.write_text("previous report", encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(main(["audit", str(self.manifest), "--output", str(output)]), 2)
+        self.assertEqual(out.getvalue(), "")
+        self.assertIn("non-finite JSON value is not permitted: NaN", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+        self.assertEqual(output.read_text(encoding="utf-8"), "previous report")
+
     def test_escaped_duplicate_key_is_a_cli_input_error_without_report(self):
         manifest = json.dumps(self.doc).replace(
             '"id": "s1"', '"id": "hidden", "\\u0069d": "s1"', 1)

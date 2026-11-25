@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject non-standard `NaN`, `Infinity`, and `-Infinity` constants in
+  manifests instead of accepting Python's permissive JSON extensions.
 - Write reports to a same-directory temporary file before atomic replacement.
   Preserve an existing report and clean up the temporary file when writing or
   replacement fails; preserve unrelated report symlinks.
