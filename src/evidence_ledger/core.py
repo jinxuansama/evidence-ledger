@@ -33,6 +33,11 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict:
     return result
 
 
+def _reject_json_constant(value: str) -> object:
+    """Reject Python's non-standard NaN and infinity JSON extensions."""
+    raise ValueError(f"non-finite JSON value is not permitted: {value}")
+
+
 def _same_file(path: Path, other: Path) -> bool:
     try:
         return path.samefile(other)
@@ -70,7 +75,11 @@ def audit(manifest_path: str | Path, draft_path: str | Path | None = None,
     An optional output path must not alias the manifest, draft, or a source.
     """
     manifest_path = Path(manifest_path).resolve()
-    doc = json.loads(manifest_path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+    doc = json.loads(
+        manifest_path.read_text(encoding="utf-8"),
+        object_pairs_hook=_unique_object,
+        parse_constant=_reject_json_constant,
+    )
     if not isinstance(doc, dict) or doc.get("version") != 1:
         raise ValueError("manifest must be an object with version=1")
     sources = _index(doc.get("sources"), "sources")
